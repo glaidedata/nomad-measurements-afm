@@ -1,18 +1,15 @@
 from nomad.config.models.plugins import ParserEntryPoint
-from pydantic import Field
 
 
-class NewParserEntryPoint(ParserEntryPoint):
-    parameter: int = Field(0, description='Custom configuration parameter')
-
+class AFMParserEntryPoint(ParserEntryPoint):
     def load(self):
-        from nomad_measurements_afm.parsers.parser import NewParser
+        from nomad_measurements_afm.parsers.parser import NTMDTAFMParser
 
-        return NewParser(**self.model_dump())
+        return NTMDTAFMParser(**self.dict())
 
 
-parser_entry_point = NewParserEntryPoint(
-    name='NewParser',
-    description='New parser entry point configuration.',
-    mainfile_name_re=r'.*\.newmainfilename',
+parser_entry_point = AFMParserEntryPoint(
+    name='NTMDTAFMParser',
+    description='Parser for NT-MDT .mdt binary AFM files.',
+    mainfile_name_re=r'^.*\.mdt$',
 )
