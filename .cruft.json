@@ -1,0 +1,33 @@
+{
+  "template": "https://github.com/FAIRmat-NFDI/cookiecutter-nomad-plugin",
+  "commit": "ae953b0ba24e2df26daf5d641faeaaebb1d8aba2",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "full_name": "Abbas Gholami",
+      "email": "abbas.gholami@glaidedata.com",
+      "github_username": "abbasgholami71",
+      "plugin_name": "nomad-measurements-afm",
+      "module_name": "nomad_measurements_afm",
+      "short_description": "NOMAD plugin for Atomic Force Microscopy (AFM) data",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "include_schema_package": true,
+      "include_normalizer": false,
+      "include_parser": true,
+      "include_app": false,
+      "include_example_uploads": false,
+      "include_action": false,
+      "include_north_tools": false,
+      "north_tool_name": "my_north_tool",
+      "include_citation_file": false,
+      "_copy_without_render": [
+        "*.html",
+        "*.png"
+      ],
+      "_template": "https://github.com/FAIRmat-NFDI/cookiecutter-nomad-plugin",
+      "_commit": "ae953b0ba24e2df26daf5d641faeaaebb1d8aba2"
+    }
+  },
+  "directory": null
+}
