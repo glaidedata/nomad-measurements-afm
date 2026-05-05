@@ -6,7 +6,6 @@ from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.datamodel.metainfo.basesections import Measurement, MeasurementResult
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
 
-# Import the reader from your readers-ientrance package!
 from readers_ientrance import read_ntmdt
 
 if TYPE_CHECKING:
@@ -91,6 +90,7 @@ class AFMChannel(ArchiveSection):
     # Image Dimensions
     x_resolution = Quantity(type=np.int32, description='Number of pixels in the X direction.')
     y_resolution = Quantity(type=np.int32, description='Number of pixels in the Y direction.')
+    z_resolution = Quantity(type=np.int32, description='Number of data points in the Z direction.')
 
     # Physical Scaling (Step sizes from the Kaitai variables)
     x_step_size = Quantity(
@@ -125,11 +125,11 @@ class AFMResult(MeasurementResult):
 
 class ELNAFMMicroscopy(Measurement, EntryData):
     m_def = Section(
-    label='NT-MDT Atomic Force Microscopy',
-    a_eln=dict(lane_width='600px'),
-    a_template=dict(
-        measurement_identifiers=dict(),
-    ),
+        label='NT-MDT Atomic Force Microscopy',
+        a_eln=dict(lane_width='600px'),
+        a_template=dict(
+            measurement_identifiers=dict(),
+        ),
     )
 
     data_file = Quantity(
@@ -139,6 +139,7 @@ class ELNAFMMicroscopy(Measurement, EntryData):
         description='The raw .mdt binary data file.',
     )
 
+    instrument_model = Quantity(type=str)
     software_version = Quantity(type=str)
     total_frames = Quantity(type=np.int32)
     measurement_technique = Quantity(type=str)
@@ -196,6 +197,9 @@ class ELNAFMMicroscopy(Measurement, EntryData):
                     meta = channel_obj.metadata
                     xml = meta.get('xml_metadata', '')
 
+                    # Determine scan direction from title (e.g., '1F:Phase1')
+                    direction = 'Forward' if name.startswith('1F:') else 'Backward' if name.startswith('1B:') else 'Unknown'
+
                     # --- Populate Global Setup (Only Once) ---
                     if not global_setup_populated and xml:
                         self.software_version = self._extract_from_xml(xml, 'BuildID')
@@ -213,12 +217,15 @@ class ELNAFMMicroscopy(Measurement, EntryData):
                         self.acquisition_setup.environment_temperature = self._extract_from_xml(xml, 'Temperature', float)
                         self.acquisition_setup.environment_humidity = self._extract_from_xml(xml, 'Humidity', float)
 
+                        # Extract Scan Parameters
+                        self.acquisition_setup.scan_velocity = meta.get('velocity')
+                        self.acquisition_setup.setpoint = meta.get('setpoint')
+                        self.acquisition_setup.bias_voltage = meta.get('bias_voltage')
+                        self.acquisition_setup.scan_direction = direction
+
                         global_setup_populated = True
 
                     # --- Extract Individual Channel Data ---
-
-                    # Determine scan direction from title (e.g., '1F:Phase1')
-                    direction = 'Forward' if name.startswith('1F:') else 'Backward' if name.startswith('1B:') else 'Unknown'
 
                     # Safely extract scales
                     x_scale_dict = meta.get('x_scale', {})
@@ -234,11 +241,15 @@ class ELNAFMMicroscopy(Measurement, EntryData):
                     if y_step and y_scale_dict.get('unit') == 'angstrom':
                         y_step *= 1e-10
 
+                    # Extract z_resolution from XML if available
+                    z_res_val = self._extract_from_xml(xml, 'ReadyPointsZ', int) if xml else None
+
                     channel = AFMChannel(
                         channel_name=name,
                         channel_type=meta.get('channel_index'),
                         x_resolution=meta.get('x_resolution'),
                         y_resolution=meta.get('y_resolution'),
+                        z_resolution=z_res_val,
                         x_step_size=x_step,
                         y_step_size=y_step,
                         z_step_size=z_scale_dict.get('step'),
