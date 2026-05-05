@@ -18,11 +18,11 @@ class NTMDTAFMParser(MatchingParser):
         if not super().is_mainfile(filename, mime, buffer, decoded_buffer, compression):
             return False
 
-        # Verify the file extension
+        # 1. Verify the file extension
         if not filename.lower().endswith('.mdt'):
             return False
 
-        # Verify the exact binary signature (first 4 bytes of an NT-MDT file are 01 B0 93 FF)
+        # 2. Verify the binary signature (first 4 bytes of an NT-MDT file)
         if buffer and buffer.startswith(b"\x01\xb0\x93\xff"):
             return True
 
@@ -43,4 +43,5 @@ class NTMDTAFMParser(MatchingParser):
 
         archive.data = entry
 
+        # Trigger the reader inside the schema's normalize function
         entry.normalize(archive, logger)

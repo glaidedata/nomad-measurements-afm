@@ -124,7 +124,13 @@ class AFMResult(MeasurementResult):
 # ==========================================
 
 class ELNAFMMicroscopy(Measurement, EntryData):
-    m_def = Section(label='NT-MDT Atomic Force Microscopy', a_eln=dict(lane_width='600px'))
+    m_def = Section(
+    label='NT-MDT Atomic Force Microscopy',
+    a_eln=dict(lane_width='600px'),
+    a_template=dict(
+        measurement_identifiers=dict(),
+    ),
+    )
 
     data_file = Quantity(
         type=str,
