@@ -1,9 +1,8 @@
 from nomad.datamodel.datamodel import EntryArchive
 from nomad.parsing.parser import MatchingParser
 
-from nomad_measurements_afm.schema_packages.schema_package import (
-    ELNAFMMicroscopy
-)
+from nomad_measurements_afm.schema_packages.schema_package import ELNAFMMicroscopy
+
 
 class NTMDTAFMParser(MatchingParser):
     def is_mainfile(
@@ -15,15 +14,12 @@ class NTMDTAFMParser(MatchingParser):
         compression: str = None,
     ) -> bool:
         """Gatekeeper for NT-MDT .mdt binary files."""
-        if not super().is_mainfile(filename, mime, buffer, decoded_buffer, compression):
-            return False
-
         # 1. Verify the file extension
         if not filename.lower().endswith('.mdt'):
             return False
 
         # 2. Verify the binary signature (first 4 bytes of an NT-MDT file)
-        if buffer and buffer.startswith(b"\x01\xb0\x93\xff"):
+        if buffer and buffer.startswith(b'\x01\xb0\x93\xff'):
             return True
 
         return False
