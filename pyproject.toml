@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    
+
 ]
 name = "nomad-measurements-afm"
 description = "NOMAD plugin for Atomic Force Microscopy (AFM) data"
@@ -25,7 +25,8 @@ maintainers = [
 ]
 license = { file = "LICENSE" }
 dependencies = [
-    "nomad-lab>=1.4.1"
+    "nomad-lab>=1.4.1",
+    "readers-ientrance @ git+https://github.com/glaidedata/readers-ientrance.git@main"
 ]
 
 [project.urls]
@@ -47,7 +48,7 @@ dev = [
 extra-index-url = [
   "https://gitlab.mpcdf.mpg.de/api/v4/projects/2187/packages/pypi/simple",
 ]
-    
+
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
 exclude = [

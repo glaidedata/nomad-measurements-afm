@@ -1,32 +1,43 @@
-from typing import (
-    TYPE_CHECKING,
-)
-
-if TYPE_CHECKING:
-    from nomad.datamodel.datamodel import (
-        EntryArchive,
-    )
-    from structlog.stdlib import (
-        BoundLogger,
-    )
-
-from nomad.config import config
-from nomad.datamodel.metainfo.workflow import Workflow
+from nomad.datamodel.datamodel import EntryArchive
 from nomad.parsing.parser import MatchingParser
 
-configuration = config.get_plugin_entry_point(
-    'nomad_measurements_afm.parsers:parser_entry_point'
-)
+from nomad_measurements_afm.schema_packages.schema_package import ELNAFMMicroscopy
 
 
-class NewParser(MatchingParser):
+class NTMDTAFMParser(MatchingParser):
+    def is_mainfile(
+        self,
+        filename: str,
+        mime: str,
+        buffer: bytes,
+        decoded_buffer: str,
+        compression: str = None,
+    ) -> bool:
+        """Gatekeeper for NT-MDT .mdt binary files."""
+        # 1. Verify the file extension
+        if not filename.lower().endswith('.mdt'):
+            return False
+
+        # 2. Verify the binary signature (first 4 bytes of an NT-MDT file)
+        if buffer and buffer.startswith(b'\x01\xb0\x93\xff'):
+            return True
+
+        return False
+
     def parse(
         self,
         mainfile: str,
-        archive: 'EntryArchive',
-        logger: 'BoundLogger',
-        child_archives: dict[str, 'EntryArchive'] = None,
+        archive: EntryArchive,
+        logger=None,
+        child_archives=None,
     ) -> None:
-        logger.info('NewParser.parse', parameter=configuration.parameter)
+        logger = logger or archive.m_context.logger
 
-        archive.workflow2 = Workflow(name='test')
+        # Instantiate the AFM schema
+        entry = ELNAFMMicroscopy()
+        entry.data_file = mainfile.rsplit('/', maxsplit=1)[-1]
+
+        archive.data = entry
+
+        # Trigger the reader inside the schema's normalize function
+        entry.normalize(archive, logger)
