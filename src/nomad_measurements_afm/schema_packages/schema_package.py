@@ -1,10 +1,11 @@
 import re
 from typing import TYPE_CHECKING, Dict, Any
 import numpy as np
-from nomad.datamodel.data import ArchiveSection, EntryData
+from nomad.datamodel.data import ArchiveSection, EntryData, JSON
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.datamodel.metainfo.basesections import Measurement, MeasurementResult
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
+import datetime
 
 # Import both readers!
 from readers_ientrance import read_ntmdt, read_bruker
@@ -292,29 +293,46 @@ class ELNNTMDTMicroscopy(BaseAFMMicroscopy, EntryData):
 
 class BrukerSpecificSetup(ArchiveSection):
     """Metadata specific to Bruker/Nanoscope AFMs."""
+    # --- Hardware & Environment ---
+    software_version = Quantity(
+        type=str,
+        description='Nanoscope software version.'
+    )
     scanner_file = Quantity(
         type=str,
-        description='The specific scanner calibration file used (e.g., 9575jvlr.scn).'
+        description='The specific scanner calibration file used.'
     )
-    operating_mode = Quantity(
+    piezo_size = Quantity(
         type=str,
-        description='Operating mode (e.g., PeakForce QNM, Tapping, Contact).'
+        description='The hardware size classification of the piezo scanner (e.g., J, E).'
     )
+    medium = Quantity(
+        type=str,
+        description='The imaging environment (e.g., Air, Fluid).'
+    )
+
+    # --- Scan Geometry ---
     x_offset = Quantity(
         type=np.float64,
-        unit='nm',
-        description='X-axis offset of the scan window.'
+        unit='m',
+        description='X-axis offset of the scan window from the piezo center.'
     )
     y_offset = Quantity(
         type=np.float64,
-        unit='nm',
-        description='Y-axis offset of the scan window.'
+        unit='m',
+        description='Y-axis offset of the scan window from the piezo center.'
     )
     scan_angle = Quantity(
         type=np.float64,
         unit='degree',
         description='Rotation angle of the scan.'
     )
+    z_range = Quantity(
+        type=np.float64,
+        description='Maximum allowed vertical extension of the Z piezo.'
+    )
+
+    # --- PID Feedback ---
     integral_gain = Quantity(
         type=np.float64,
         description='Main integral gain for the feedback loop.'
@@ -323,13 +341,43 @@ class BrukerSpecificSetup(ArchiveSection):
         type=np.float64,
         description='Main proportional gain for the feedback loop.'
     )
+    engage_setpoint = Quantity(
+        type=np.float64,
+        description='The threshold value used to trigger surface engagement.'
+    )
+
+    # --- PeakForce QNM & Nanomechanics ---
+    operating_mode = Quantity(
+        type=str,
+        description='e.g., PeakForce QNM, Tapping.'
+    )
     peak_force_amplitude = Quantity(
         type=np.float64,
-        description='Amplitude setting for PeakForce Tapping mode.'
+        description='Oscillation amplitude for PeakForce Tapping mode.'
     )
-    peak_force_setpoint = Quantity(
+    peak_force_engage_setpoint = Quantity(
         type=np.float64,
-        description='Engage setpoint for PeakForce Tapping.'
+        description='Engage setpoint specific to PeakForce mode.'
+    )
+    sync_distance = Quantity(
+        type=np.float64,
+        description='Phase delay distance between the drive signal and tip response.'
+    )
+
+    # --- Advanced Mechanical Models ---
+    sample_poissons_ratio = Quantity(type=np.float64)
+    tip_half_angle = Quantity(type=np.float64, description='Tip angle in radians or degrees.')
+    modulus_fit_model = Quantity(type=str, description='e.g., Hertzian (Spherical).')
+    scan_asyst_noise_threshold = Quantity(type=np.float64)
+    torsional_frequency = Quantity(type=np.float64, description='Torsional resonance.')
+    torsional_q_factor = Quantity(type=np.float64)
+
+    # ==========================================
+    # THE CATCH-ALL FOR HEAVILY DETAILED HEADER
+    # ==========================================
+    raw_metadata = Quantity(
+        type=JSON,
+        description='A complete dictionary dump of every single line in the Bruker header.',
     )
 
 
@@ -351,8 +399,18 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
             with archive.m_context.raw_file(self.data_file) as file:
                 afm_data = read_bruker(file.name)
 
+            # --- 1. Map Global Base Setup ---
             self.instrument_model = afm_data.metadata.get("instrument_model", "Bruker AFM")
             self.measurement_technique = afm_data.metadata.get("operating_mode")
+
+            # Parse the timestamp directly into NOMAD's core datetime field
+            date_str = afm_data.metadata.get("Date")
+            if date_str:
+                try:
+                    # Bruker format: "05:05:28 PM Thu Feb 26 2026"
+                    self.datetime = datetime.datetime.strptime(date_str, "%I:%M:%S %p %a %b %d %Y")
+                except ValueError:
+                    pass
 
             if not self.results:
                 self.results = [AFMResult()]
@@ -360,52 +418,72 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
                 self.probe_setup = AFMProbe()
             if not self.acquisition_setup:
                 self.acquisition_setup = AFMAcquisitionSetup()
-            if not self.bruker_setup:
+            if not getattr(self, "bruker_setup", None):
                 self.bruker_setup = BrukerSpecificSetup()
 
-            # Map Global Bruker Metadata
             self.probe_setup.probe_id = afm_data.metadata.get("probe_id")
             if afm_data.metadata.get("tip_radius"):
                 self.probe_setup.tip_radius = afm_data.metadata.get("tip_radius")
-
             if afm_data.metadata.get("scan_rate"):
                 self.acquisition_setup.scan_rate = afm_data.metadata.get("scan_rate")
 
             # Convert Scan Size to SI Meters
             scan_size_raw = afm_data.metadata.get("scan_size")
             scan_unit = afm_data.metadata.get("scan_size_unit", "nm")
-
             if scan_size_raw is not None:
                 if scan_unit.lower() == "nm":
                     self.acquisition_setup.scan_size = scan_size_raw * 1e-9
-                elif scan_unit.lower() in ["um", "~m"]: # Latin-1 encoding sometimes outputs ~m for um
+                elif scan_unit.lower() in ["um", "~m"]:
                     self.acquisition_setup.scan_size = scan_size_raw * 1e-6
                 else:
                     self.acquisition_setup.scan_size = scan_size_raw
 
-            # --- MAP THE NEW BRUKER FIELDS ---
+            # --- 2. Map the New Bruker-Specific Setup ---
+            # Strings
+            self.bruker_setup.software_version = afm_data.metadata.get("Version")
             self.bruker_setup.scanner_file = afm_data.metadata.get("Scanner file")
-            self.bruker_setup.operating_mode = afm_data.metadata.get("MicroscopeList") # From @MicroscopeList
+            self.bruker_setup.piezo_size = afm_data.metadata.get("Piezo size")
+            self.bruker_setup.medium = afm_data.metadata.get("Medium")
+            self.bruker_setup.operating_mode = afm_data.metadata.get("Operating mode")
+            self.bruker_setup.modulus_fit_model = afm_data.metadata.get("Modulus Fit Model")
 
-            if "X Offset" in afm_data.metadata:
-                self.bruker_setup.x_offset = float(afm_data.metadata["X Offset"].split()[0])
-            if "Y Offset" in afm_data.metadata:
-                self.bruker_setup.y_offset = float(afm_data.metadata["Y Offset"].split()[0])
-            if "Rotate Ang." in afm_data.metadata:
-                self.bruker_setup.scan_angle = float(afm_data.metadata["Rotate Ang."])
+            # Helper to safely extract and cast floats
+            def safe_float(key):
+                val = afm_data.metadata.get(key)
+                if val is not None:
+                    try:
+                        # Handles strings like "-11892.6 nm" by splitting at the space
+                        return float(val.split()[0]) if isinstance(val, str) else float(val)
+                    except ValueError:
+                        pass
+                return None
 
-            if "IntGain" in afm_data.metadata:
-                self.bruker_setup.integral_gain = float(afm_data.metadata["IntGain"])
-            if "PrpGain" in afm_data.metadata:
-                self.bruker_setup.proportional_gain = float(afm_data.metadata["PrpGain"])
+            # Physical Conversions (nm to m)
+            x_offset = safe_float("X Offset")
+            if x_offset is not None: self.bruker_setup.x_offset = x_offset * 1e-9
 
-            if "Peak Force Amplitude" in afm_data.metadata:
-                self.bruker_setup.peak_force_amplitude = float(afm_data.metadata["Peak Force Amplitude"])
-            if "Peak Force Engage Setpoint" in afm_data.metadata:
-                self.bruker_setup.peak_force_setpoint = float(afm_data.metadata["Peak Force Engage Setpoint"])
+            y_offset = safe_float("Y Offset")
+            if y_offset is not None: self.bruker_setup.y_offset = y_offset * 1e-9
 
+            # Direct floats
+            self.bruker_setup.scan_angle = safe_float("Rotate Ang.")
+            self.bruker_setup.z_range = safe_float("Z Range")
+            self.bruker_setup.integral_gain = safe_float("IntGain")
+            self.bruker_setup.proportional_gain = safe_float("PrpGain")
+            self.bruker_setup.engage_setpoint = safe_float("Engage Setpoint")
+            self.bruker_setup.peak_force_amplitude = safe_float("Peak Force Amplitude")
+            self.bruker_setup.peak_force_engage_setpoint = safe_float("Peak Force Engage Setpoint")
+            self.bruker_setup.sync_distance = safe_float("Sync Distance")
+            self.bruker_setup.sample_poissons_ratio = safe_float("Sample Poisson's Ratio")
+            self.bruker_setup.tip_half_angle = safe_float("Tip Half Angle")
+            self.bruker_setup.scan_asyst_noise_threshold = safe_float("ScanAsyst Noise Threshold")
+            self.bruker_setup.torsional_frequency = safe_float("Torsional Freq")
+            self.bruker_setup.torsional_q_factor = safe_float("Torsional Q")
 
-            # Map Channels
+            # The Catch-All!
+            self.bruker_setup.raw_metadata = afm_data.metadata
+
+            # --- 3. Map Channels ---
             channel_sections = []
             if afm_data.channels:
                 for name, channel_obj in afm_data.channels.items():
@@ -414,7 +492,6 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
                     x_res = meta.get("x_res")
                     y_res = meta.get("y_res")
 
-                    # Calculate step sizes if possible
                     x_step = None
                     y_step = None
                     if self.acquisition_setup.scan_size and x_res and y_res:
