@@ -9,6 +9,6 @@ class AFMSchemaPackageEntryPoint(SchemaPackageEntryPoint):
 
 
 schema_package_entry_point = AFMSchemaPackageEntryPoint(
-    name='AFMMicroscopySchema',
-    description='Schema package for NT-MDT Atomic Force Microscopy (AFM) data.',
+    name='AFM Schema',
+    description='Schema package for Atomic Force Microscopy measurements (NT-MDT and Bruker).',
 )
