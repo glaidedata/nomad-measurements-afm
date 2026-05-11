@@ -1,12 +1,14 @@
 import re
+
 from nomad.datamodel.datamodel import EntryArchive
 from nomad.parsing.parser import MatchingParser
 
 # Import both of our specialized schemas!
 from nomad_measurements_afm.schema_packages.schema_package import (
+    ELNBrukerMicroscopy,
     ELNNTMDTMicroscopy,
-    ELNBrukerMicroscopy
 )
+
 
 class AFMParser(MatchingParser):
     def is_mainfile(
@@ -23,15 +25,17 @@ class AFMParser(MatchingParser):
 
         # 1. NT-MDT Check (.mdt + Hex Signature)
         if filename_lower.endswith('.mdt'):
-            if buffer and buffer.startswith(b"\x01\xb0\x93\xff"):
+            if buffer and buffer.startswith(b'\x01\xb0\x93\xff'):
                 return True
 
         # 2. Bruker Check (.spm or .001, .002, .003, etc. + ASCII Signature)
         # Using a regex to catch any 3-digit extension
-        is_bruker_ext = filename_lower.endswith('.spm') or re.search(r'\.\d{3}$', filename_lower)
+        is_bruker_ext = filename_lower.endswith('.spm') or re.search(
+            r'\.\d{3}$', filename_lower
+        )
         if is_bruker_ext:
             # Bruker files universally start with this exact string
-            if buffer and buffer.startswith(b"\\*File list"):
+            if buffer and buffer.startswith(b'\\*File list'):
                 return True
 
         return False
@@ -55,7 +59,7 @@ class AFMParser(MatchingParser):
         elif filename_lower.endswith('.spm') or re.search(r'\.\d{3}$', filename_lower):
             entry = ELNBrukerMicroscopy()
         else:
-            logger.error(f"Unsupported AFM file format: {filename}")
+            logger.error(f'Unsupported AFM file format: {filename}')
             return
 
         # Assign the file and attach the schema to the archive
