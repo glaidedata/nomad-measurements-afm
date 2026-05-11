@@ -1,15 +1,15 @@
 from nomad.config.models.plugins import ParserEntryPoint
 
 
-class NTMDTAFMParserEntryPoint(ParserEntryPoint):
+class AFMParserEntryPoint(ParserEntryPoint):
     def load(self):
-        from .parser import NTMDTAFMParser
+        from nomad_measurements_afm.parsers.parser import AFMParser
 
-        return NTMDTAFMParser(**self.dict())
+        return AFMParser(**self.dict())
 
 
-parser_entry_point = NTMDTAFMParserEntryPoint(
-    name='NT-MDT AFM Parser',
-    description='Parser for NT-MDT .mdt binary AFM files.',
-    mainfile_name_re=r'^.*\.mdt$',
+parser_entry_point = AFMParserEntryPoint(
+    name='AFM Parser',
+    description='Parser for NT-MDT (.mdt) and Bruker (.003) AFM files.',
+    mainfile_name_re=r'^.*\.(mdt|\d{3})$',
 )
