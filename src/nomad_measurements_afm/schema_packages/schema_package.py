@@ -7,7 +7,6 @@ from nomad.datamodel.data import JSON, ArchiveSection, EntryData
 from nomad.datamodel.metainfo.annotations import ELNComponentEnum
 from nomad.datamodel.metainfo.basesections import Measurement, MeasurementResult
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
-
 from readers_ientrance import read_bruker, read_ntmdt
 
 if TYPE_CHECKING:
@@ -50,7 +49,9 @@ class AFMProbe(ArchiveSection):
         type=np.float64, description='Quality factor of the torsional resonance.'
     )
     tip_half_angle = Quantity(
-        type=np.float64, unit='rad', description='Tip half-angle used for mechanical modeling.'
+        type=np.float64,
+        unit='rad',
+        description='Tip half-angle used for mechanical modeling.',
     )
 
 
@@ -103,7 +104,9 @@ class AFMAcquisitionSetup(ArchiveSection):
         type=np.float64, unit='degree', description='Rotation angle of the scan.'
     )
     z_range = Quantity(
-        type=np.float64, unit='m', description='Maximum vertical extension of the Z piezo.'
+        type=np.float64,
+        unit='m',
+        description='Maximum vertical extension of the Z piezo.',
     )
 
     # Generalized Feedback & Oscillation
@@ -114,13 +117,16 @@ class AFMAcquisitionSetup(ArchiveSection):
         type=np.float64, description='Main proportional gain for the feedback loop.'
     )
     engage_setpoint = Quantity(
-        type=np.float64, description='The threshold value used to trigger surface engagement.'
+        type=np.float64,
+        description='The threshold value used to trigger surface engagement.',
     )
     oscillation_amplitude = Quantity(
-        type=np.float64, description='Drive amplitude for dynamic/tapping/PeakForce modes.'
+        type=np.float64,
+        description='Drive amplitude for dynamic/tapping/PeakForce modes.',
     )
     phase_sync_distance = Quantity(
-        type=np.float64, description='Phase delay/sync distance between drive and response.'
+        type=np.float64,
+        description='Phase delay/sync distance between drive and response.',
     )
 
 
@@ -414,9 +420,15 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
         if afm_data.metadata.get('tip_radius'):
             self.probe_setup.tip_radius = afm_data.metadata.get('tip_radius')
 
-        self.probe_setup.torsional_frequency = self._safe_float(afm_data.metadata, 'Torsional Freq')
-        self.probe_setup.torsional_q_factor = self._safe_float(afm_data.metadata, 'Torsional Q')
-        self.probe_setup.tip_half_angle = self._safe_float(afm_data.metadata, 'Tip Half Angle')
+        self.probe_setup.torsional_frequency = self._safe_float(
+            afm_data.metadata, 'Torsional Freq'
+        )
+        self.probe_setup.torsional_q_factor = self._safe_float(
+            afm_data.metadata, 'Torsional Q'
+        )
+        self.probe_setup.tip_half_angle = self._safe_float(
+            afm_data.metadata, 'Tip Half Angle'
+        )
 
         # Acquisition Mapping
         if afm_data.metadata.get('scan_rate'):
@@ -442,13 +454,25 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
         if y_off is not None:
             self.acquisition_setup.y_offset = y_off * 1e-9
 
-        self.acquisition_setup.scan_angle = self._safe_float(afm_data.metadata, 'Rotate Ang.')
+        self.acquisition_setup.scan_angle = self._safe_float(
+            afm_data.metadata, 'Rotate Ang.'
+        )
         self.acquisition_setup.z_range = self._safe_float(afm_data.metadata, 'Z Range')
-        self.acquisition_setup.integral_gain = self._safe_float(afm_data.metadata, 'IntGain')
-        self.acquisition_setup.proportional_gain = self._safe_float(afm_data.metadata, 'PrpGain')
-        self.acquisition_setup.engage_setpoint = self._safe_float(afm_data.metadata, 'Engage Setpoint')
-        self.acquisition_setup.oscillation_amplitude = self._safe_float(afm_data.metadata, 'Peak Force Amplitude')
-        self.acquisition_setup.phase_sync_distance = self._safe_float(afm_data.metadata, 'Sync Distance')
+        self.acquisition_setup.integral_gain = self._safe_float(
+            afm_data.metadata, 'IntGain'
+        )
+        self.acquisition_setup.proportional_gain = self._safe_float(
+            afm_data.metadata, 'PrpGain'
+        )
+        self.acquisition_setup.engage_setpoint = self._safe_float(
+            afm_data.metadata, 'Engage Setpoint'
+        )
+        self.acquisition_setup.oscillation_amplitude = self._safe_float(
+            afm_data.metadata, 'Peak Force Amplitude'
+        )
+        self.acquisition_setup.phase_sync_distance = self._safe_float(
+            afm_data.metadata, 'Sync Distance'
+        )
 
     def _map_channels(self, afm_data) -> list:
         """Extracts and builds the AFMChannel sections."""
@@ -463,11 +487,7 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
 
             x_step = None
             y_step = None
-            if (
-                self.acquisition_setup
-                and self.acquisition_setup.scan_size
-                and x_res
-            ):
+            if self.acquisition_setup and self.acquisition_setup.scan_size and x_res:
                 x_step = self.acquisition_setup.scan_size / x_res
                 if y_res > 1:
                     y_step = self.acquisition_setup.scan_size / y_res

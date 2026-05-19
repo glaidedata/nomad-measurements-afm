@@ -29,10 +29,15 @@ class AFMParser(MatchingParser):
                 return True
 
         # 2. Bruker Check (.spm or .001, .002, .003, etc. + ASCII Signature)
-        is_bruker_ext = filename_lower.endswith('.spm') or re.search(r'\.\d{3}$', filename_lower)
+        is_bruker_ext = filename_lower.endswith('.spm') or re.search(
+            r'\.\d{3}$', filename_lower
+        )
         if is_bruker_ext:
             # Accept both Image scans (\*File list) and Force curves (\*Force file list)
-            if buffer and (buffer.startswith(b"\\*File list") or buffer.startswith(b"\\*Force file list")):
+            if buffer and (
+                buffer.startswith(b'\\*File list')
+                or buffer.startswith(b'\\*Force file list')
+            ):
                 return True
 
         return False
