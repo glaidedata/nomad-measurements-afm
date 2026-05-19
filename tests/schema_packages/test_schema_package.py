@@ -128,25 +128,27 @@ def test_bruker_schema_normalization(mock_read_bruker):
         2026, 2, 26, 17, 5, 28, tzinfo=datetime.timezone.utc
     )
 
+    # Assert Generalized Setup Properties (Moved out of bruker_setup)
+    assert entry.software_version == '0x08150307'
+    assert entry.acquisition_setup.medium == 'Fluid'
+    assert entry.acquisition_setup.oscillation_amplitude == 100.0  # noqa: PLR2004
+
     # Assert Physical Math (10,000 nm should convert to 0.00001 m)
     assert np.isclose(entry.acquisition_setup.scan_size.magnitude, 10000.0 * 1e-9)
     assert entry.acquisition_setup.scan_rate.magnitude == 0.542535  # noqa: PLR2004
+    assert np.isclose(entry.acquisition_setup.x_offset.magnitude, -11892.6 * 1e-9)
+    assert entry.acquisition_setup.scan_angle.magnitude == 90.5  # noqa: PLR2004
 
-    # Assert the Bruker Specific Setup mapped perfectly
-    assert entry.bruker_setup.software_version == '0x08150307'
-    assert entry.bruker_setup.scanner_file == '9575jvlr.scn'
-    assert entry.bruker_setup.medium == 'Fluid'
-
-    # Assert string-to-float physical conversion
-    assert np.isclose(entry.bruker_setup.x_offset.magnitude, -11892.6 * 1e-9)
-    assert entry.bruker_setup.scan_angle.magnitude == 90.5  # noqa: PLR2004
-    assert entry.bruker_setup.peak_force_amplitude == 100.0  # noqa: PLR2004
-
-    # Assert the dictionary catch-all
-    assert entry.bruker_setup.raw_metadata['Piezo size'] == 'J'
+    # Assert the dictionary catch-all (now resides on the main entry)
+    assert entry.raw_metadata['Piezo size'] == 'J'
+    assert entry.raw_metadata['Scanner file'] == '9575jvlr.scn'
 
     # Assert Channel Data (Step size = scan_size / resolution)
     channel = entry.results[0].channels[0]
     assert channel.channel_name == 'Retrace_Height'
     expected_step = (10000.0 * 1e-9) / 256
     assert np.isclose(channel.x_step_size.magnitude, expected_step)
+
+    # Ensure it routed to image_data because y_resolution > 1
+    assert channel.image_data is not None
+    assert channel.line_data is None

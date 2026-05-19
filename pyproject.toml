@@ -26,7 +26,7 @@ maintainers = [
 license = { file = "LICENSE" }
 dependencies = [
     "nomad-lab>=1.4.1",
-    "readers-ientrance @ git+https://github.com/glaidedata/readers-ientrance.git@v0.3.0"
+    "readers-ientrance @ git+https://github.com/glaidedata/readers-ientrance.git@v0.3.1"
 ]
 
 [project.urls]
