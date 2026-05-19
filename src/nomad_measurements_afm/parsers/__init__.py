@@ -10,6 +10,6 @@ class AFMParserEntryPoint(ParserEntryPoint):
 
 parser_entry_point = AFMParserEntryPoint(
     name='AFM Parser',
-    description='Parser for NT-MDT (.mdt) and Bruker (.003) AFM files.',
+    description='Parser for NT-MDT (.mdt) and Bruker (sequential formats: 001, 002, 003, ...) AFM files.',
     mainfile_name_re=r'^.*\.(mdt|\d{3})$',
 )
