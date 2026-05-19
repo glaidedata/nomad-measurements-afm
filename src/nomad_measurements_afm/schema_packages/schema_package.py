@@ -518,7 +518,7 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
         for name, channel_obj in afm_data.channels.items():
             meta = channel_obj.metadata
             x_res = meta.get('x_res')
-            y_res = meta.get('y_res')
+            y_res = meta.get('y_res', 1)
 
             x_step = None
             y_step = None
@@ -526,10 +526,15 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
                 self.acquisition_setup
                 and self.acquisition_setup.scan_size
                 and x_res
-                and y_res
             ):
                 x_step = self.acquisition_setup.scan_size / x_res
-                y_step = self.acquisition_setup.scan_size / y_res
+                # Only calculate a Y-step if it's a 2D image
+                if y_res > 1:
+                    y_step = self.acquisition_setup.scan_size / y_res
+
+            # CRITICAL: Force the array to be at least 2D to satisfy NOMAD's shape=['*', '*']
+            # Images stay (512, 512). Force curves become (1, 4096).
+            safe_data = np.atleast_2d(channel_obj.data)
 
             channel = AFMChannel(
                 channel_name=name,
@@ -538,7 +543,7 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
                 y_resolution=y_res,
                 x_step_size=x_step,
                 y_step_size=y_step,
-                data=channel_obj.data,
+                data=safe_data,
             )
             channel_sections.append(channel)
 
