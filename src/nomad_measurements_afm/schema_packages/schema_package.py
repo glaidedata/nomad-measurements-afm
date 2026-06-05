@@ -142,6 +142,14 @@ class AFMForceChannel(ArchiveSection):
     channel_name = Quantity(type=str, description='Name of the extracted signal.')
     channel_type = Quantity(type=str, description='Classification of the signal.')
 
+    x_resolution = Quantity(type=np.int32, description='Number of pixels in X.')
+    y_resolution = Quantity(type=np.int32, description='Number of pixels in Y.')
+    z_resolution = Quantity(type=np.int32, description='Number of points in Z.')
+
+    x_step_size = Quantity(type=np.float64, unit='m')
+    y_step_size = Quantity(type=np.float64, unit='m')
+    z_step_size = Quantity(type=np.float64)
+
     line_data = Quantity(
         type=HDF5Dataset,
         description='The 1D array of the AFM force curve or line scan.',
@@ -157,8 +165,10 @@ class AFMImageChannel(ArchiveSection):
 
     channel_name = Quantity(type=str, description='Name of the extracted signal.')
     channel_type = Quantity(type=str, description='Classification of the signal.')
+
     x_resolution = Quantity(type=np.int32, description='Number of pixels in X.')
     y_resolution = Quantity(type=np.int32, description='Number of pixels in Y.')
+    z_resolution = Quantity(type=np.int32, description='Number of points in Z.')
 
     x_step_size = Quantity(type=np.float64, unit='m')
     y_step_size = Quantity(type=np.float64, unit='m')
@@ -334,7 +344,11 @@ class ELNNTMDTMicroscopy(BaseAFMMicroscopy, EntryData):
             self.total_frames = afm_data.metadata.get('Total Frames')
             self.raw_metadata = afm_data.metadata
 
-            self.results = [AFMResult()]
+            # Only create the results section if it doesn't exist
+            if not self.results:
+                self.results = [AFMResult()]
+
+            # Clear the channels to prevent duplicates on re-processing
             self.results[0].image_channels = []
             self.results[0].force_channels = []
 
@@ -527,7 +541,11 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
 
             self._map_metadata(afm_data)
 
-            self.results = [AFMResult()]
+            # Only create the results section if it doesn't exist
+            if not self.results:
+                self.results = [AFMResult()]
+
+            # Clear the channels to prevent duplicates on re-processing
             self.results[0].image_channels = []
             self.results[0].force_channels = []
 
