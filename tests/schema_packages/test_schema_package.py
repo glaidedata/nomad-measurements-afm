@@ -2,6 +2,7 @@ import datetime
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import nomad.files
 from nomad.datamodel import EntryArchive
 from nomad.datamodel.datamodel import EntryMetadata
 
@@ -20,7 +21,6 @@ from nomad_measurements_afm.schema_packages.schema_package import (
 def test_ntmdt_schema_normalization(mock_upload_files_get, mock_read_ntmdt, tmp_path):
     """Tests if the NT-MDT schema accurately maps data into NOMAD Quantities."""
 
-    # Let h5py write to a safe, real temporary directory provided by pytest
     mock_upload_files_get.return_value.archive_hdf5_location.return_value = str(tmp_path / 'test.h5')
 
     mock_data = MagicMock()
@@ -84,7 +84,6 @@ def test_ntmdt_schema_normalization(mock_upload_files_get, mock_read_ntmdt, tmp_
 def test_bruker_schema_normalization(mock_upload_files_get, mock_read_bruker, tmp_path):
     """Tests if the Bruker schema accurately maps deep metadata and channels."""
 
-    # Let h5py write to a safe, real temporary directory provided by pytest
     mock_upload_files_get.return_value.archive_hdf5_location.return_value = str(tmp_path / 'test.h5')
 
     mock_data = MagicMock()
