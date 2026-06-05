@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from nomad.datamodel.data import JSON, ArchiveSection, EntryData
-from nomad.datamodel.metainfo.annotations import ELNComponentEnum
+from nomad.datamodel.hdf5 import HDF5Dataset
+from nomad.datamodel.metainfo.annotations import ELNComponentEnum, H5WebAnnotation
 from nomad.datamodel.metainfo.basesections import Measurement, MeasurementResult
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
 from readers_ientrance import read_bruker, read_ntmdt
@@ -133,57 +134,57 @@ class AFMAcquisitionSetup(ArchiveSection):
 # ==========================================
 # 2. SHARED AFM RESULTS (THE SCANS)
 # ==========================================
-class AFMChannel(ArchiveSection):
-    """A repeating section to hold each individual 2D/1D scan and its metadata."""
+class AFMForceChannel(ArchiveSection):
+    """A section to hold a 1D Force Curve."""
 
-    channel_name = Quantity(
-        type=str,
-        description='Name of the extracted signal (e.g., 1F:Phase1, Retrace_Height).',
-    )
-    channel_type = Quantity(
-        type=str,
-        description='Classification of the signal (e.g., topography, phase, amplitude).',
-    )
+    m_def = Section(a_h5web=H5WebAnnotation(signal='line_data'))
 
-    x_resolution = Quantity(
-        type=np.int32, description='Number of pixels in the X direction.'
-    )
-    y_resolution = Quantity(
-        type=np.int32, description='Number of pixels in the Y direction.'
-    )
-    z_resolution = Quantity(
-        type=np.int32, description='Number of data points in the Z direction.'
-    )
+    channel_name = Quantity(type=str, description='Name of the extracted signal.')
+    channel_type = Quantity(type=str, description='Classification of the signal.')
 
-    x_step_size = Quantity(
-        type=np.float64,
-        unit='m',
-        description='Physical size of one pixel in the X direction.',
-    )
-    y_step_size = Quantity(
-        type=np.float64,
-        unit='m',
-        description='Physical size of one pixel in the Y direction.',
-    )
-    z_step_size = Quantity(
-        type=np.float64,
-        description='Scaling multiplier to convert raw Z values to physical units.',
-    )
+    x_resolution = Quantity(type=np.int32, description='Number of pixels in X.')
+    y_resolution = Quantity(type=np.int32, description='Number of pixels in Y.')
+    z_resolution = Quantity(type=np.int32, description='Number of points in Z.')
+
+    x_step_size = Quantity(type=np.float64, unit='m')
+    y_step_size = Quantity(type=np.float64, unit='m')
+    z_step_size = Quantity(type=np.float64)
 
     line_data = Quantity(
-        type=np.float64,
-        shape=['*'],
+        type=HDF5Dataset,
         description='The 1D array of the AFM force curve or line scan.',
     )
-    image_data = Quantity(
-        type=np.float64,
-        shape=['*', '*'],
-        description='The 2D array of the AFM image/topography.',
+
+
+class AFMImageChannel(ArchiveSection):
+    """A section to hold a 2D Topography Map."""
+
+    m_def = Section(
+        a_h5web=H5WebAnnotation(signal='image_data', axes=['y_axis', 'x_axis'])
     )
+
+    channel_name = Quantity(type=str, description='Name of the extracted signal.')
+    channel_type = Quantity(type=str, description='Classification of the signal.')
+
+    x_resolution = Quantity(type=np.int32, description='Number of pixels in X.')
+    y_resolution = Quantity(type=np.int32, description='Number of pixels in Y.')
+    z_resolution = Quantity(type=np.int32, description='Number of points in Z.')
+
+    x_step_size = Quantity(type=np.float64, unit='m')
+    y_step_size = Quantity(type=np.float64, unit='m')
+    z_step_size = Quantity(type=np.float64)
+
+    image_data = Quantity(
+        type=HDF5Dataset,
+        description='The raw 2D array of the AFM image/topography.',
+    )
+    x_axis = Quantity(type=HDF5Dataset, unit='m', description='X-axis coordinates.')
+    y_axis = Quantity(type=HDF5Dataset, unit='m', description='Y-axis coordinates.')
 
 
 class AFMResult(MeasurementResult):
-    channels = SubSection(section_def=AFMChannel, repeats=True)
+    image_channels = SubSection(section_def=AFMImageChannel, repeats=True)
+    force_channels = SubSection(section_def=AFMForceChannel, repeats=True)
 
 
 # ==========================================
@@ -283,8 +284,13 @@ class ELNNTMDTMicroscopy(BaseAFMMicroscopy, EntryData):
         self.acquisition_setup.scan_direction = direction
 
     def _create_channel(
-        self, name: str, meta: dict[str, Any], xml: str, data: np.ndarray
-    ) -> AFMChannel:
+        self,
+        name: str,
+        meta: dict[str, Any],
+        xml: str,
+        data: np.ndarray,
+        result_section,
+    ):
         x_scale_dict = meta.get('x_scale', {})
         y_scale_dict = meta.get('y_scale', {})
         z_scale_dict = meta.get('z_scale', {})
@@ -299,7 +305,6 @@ class ELNNTMDTMicroscopy(BaseAFMMicroscopy, EntryData):
 
         z_res_val = self._extract_from_xml(xml, 'ReadyPointsZ', int) if xml else None
 
-        # Build the shared kwargs
         channel_kwargs = dict(
             channel_name=name,
             channel_type=meta.get('channel_index'),
@@ -311,14 +316,20 @@ class ELNNTMDTMicroscopy(BaseAFMMicroscopy, EntryData):
             z_step_size=z_scale_dict.get('step'),
         )
 
-        # Route the data to the correct 1D or 2D Quantity
         raw_array = np.array(data)
         if meta.get('y_resolution', 1) == 1 or raw_array.ndim == 1:
-            channel_kwargs['line_data'] = raw_array.flatten()
+            chan = AFMForceChannel(**channel_kwargs)
+            result_section.force_channels.append(chan)
+            chan.line_data = raw_array.flatten()
         else:
-            channel_kwargs['image_data'] = np.atleast_2d(raw_array)
+            chan = AFMImageChannel(**channel_kwargs)
+            result_section.image_channels.append(chan)
 
-        return AFMChannel(**channel_kwargs)
+            x_res = meta.get('x_resolution', 1)
+            y_res = meta.get('y_resolution', 1)
+            chan.x_axis = np.arange(x_res) * (x_step if x_step else 1.0)
+            chan.y_axis = np.arange(y_res) * (y_step if y_step else 1.0)
+            chan.image_data = np.atleast_2d(raw_array)
 
     def normalize(self, archive: 'EntryArchive', logger: 'BoundLogger'):
         if not self.data_file:
@@ -333,15 +344,20 @@ class ELNNTMDTMicroscopy(BaseAFMMicroscopy, EntryData):
             self.total_frames = afm_data.metadata.get('Total Frames')
             self.raw_metadata = afm_data.metadata
 
+            # Only create the results section if it doesn't exist
             if not self.results:
                 self.results = [AFMResult()]
+
+            # Clear the channels to prevent duplicates on re-processing
+            self.results[0].image_channels = []
+            self.results[0].force_channels = []
+
             if not self.probe_setup:
                 self.probe_setup = AFMProbe()
             if not self.acquisition_setup:
                 self.acquisition_setup = AFMAcquisitionSetup()
 
             global_setup_populated = False
-            channel_sections = []
 
             if afm_data.channels:
                 for name, channel_obj in afm_data.channels.items():
@@ -360,10 +376,9 @@ class ELNNTMDTMicroscopy(BaseAFMMicroscopy, EntryData):
                         self._populate_global_setup(meta, xml, direction)
                         global_setup_populated = True
 
-                    channel = self._create_channel(name, meta, xml, channel_obj.data)
-                    channel_sections.append(channel)
-
-            self.results[0].channels = channel_sections
+                    self._create_channel(
+                        name, meta, xml, channel_obj.data, self.results[0]
+                    )
 
         except Exception as e:
             if logger:
@@ -474,11 +489,10 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
             afm_data.metadata, 'Sync Distance'
         )
 
-    def _map_channels(self, afm_data) -> list:
-        """Extracts and builds the AFMChannel sections."""
-        channel_sections = []
+    def _map_channels(self, afm_data, result_section) -> None:
+        """Extracts and builds the AFMImageChannel and AFMForceChannel sections."""
         if not afm_data.channels:
-            return channel_sections
+            return
 
         for name, channel_obj in afm_data.channels.items():
             meta = channel_obj.metadata
@@ -492,7 +506,6 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
                 if y_res > 1:
                     y_step = self.acquisition_setup.scan_size / y_res
 
-            # Build the shared kwargs
             channel_kwargs = dict(
                 channel_name=name,
                 channel_type=meta.get('channel_name'),
@@ -502,16 +515,20 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
                 y_step_size=y_step,
             )
 
-            # Route the data to the correct 1D or 2D Quantity
+            # Route the data
             if y_res == 1 or channel_obj.data.ndim == 1:
-                channel_kwargs['line_data'] = channel_obj.data.flatten()
+                chan = AFMForceChannel(**channel_kwargs)
+                result_section.force_channels.append(chan)
+                chan.line_data = channel_obj.data.flatten()
             else:
-                channel_kwargs['image_data'] = np.atleast_2d(channel_obj.data)
+                chan = AFMImageChannel(**channel_kwargs)
+                result_section.image_channels.append(chan)
 
-            channel = AFMChannel(**channel_kwargs)
-            channel_sections.append(channel)
-
-        return channel_sections
+                x_res_val = x_res if x_res else 1
+                y_res_val = y_res if y_res else 1
+                chan.x_axis = np.arange(x_res_val) * (x_step if x_step else 1.0)
+                chan.y_axis = np.arange(y_res_val) * (y_step if y_step else 1.0)
+                chan.image_data = np.atleast_2d(channel_obj.data)
 
     def normalize(self, archive: 'EntryArchive', logger: 'BoundLogger'):
         if not self.data_file:
@@ -524,10 +541,15 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
 
             self._map_metadata(afm_data)
 
+            # Only create the results section if it doesn't exist
             if not self.results:
                 self.results = [AFMResult()]
 
-            self.results[0].channels = self._map_channels(afm_data)
+            # Clear the channels to prevent duplicates on re-processing
+            self.results[0].image_channels = []
+            self.results[0].force_channels = []
+
+            self._map_channels(afm_data, self.results[0])
 
         except Exception as e:
             if logger:

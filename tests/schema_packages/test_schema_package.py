@@ -16,8 +16,11 @@ from nomad_measurements_afm.schema_packages.schema_package import (
 
 
 @patch('nomad_measurements_afm.schema_packages.schema_package.read_ntmdt')
-def test_ntmdt_schema_normalization(mock_read_ntmdt):
+@patch('nomad.datamodel.hdf5.HDF5Dataset._normalize_impl')
+def test_ntmdt_schema_normalization(mock_hdf5_normalize, mock_read_ntmdt):
     """Tests if the NT-MDT schema accurately maps data into NOMAD Quantities."""
+
+    mock_hdf5_normalize.return_value = 'dummy_hdf5_path'
 
     mock_data = MagicMock()
     mock_data.metadata = {'Total Frames': 1}
@@ -56,6 +59,9 @@ def test_ntmdt_schema_normalization(mock_read_ntmdt):
     entry = ELNNTMDTMicroscopy()
     entry.data_file = 'dummy_scan.mdt'
 
+    # Attach the entry to the archive before normalizing
+    archive.data = entry
+
     entry.normalize(archive, None)
 
     assert entry.instrument_model == 'NT-MDT AFM'
@@ -64,7 +70,7 @@ def test_ntmdt_schema_normalization(mock_read_ntmdt):
 
     assert entry.probe_setup.resonant_frequency.magnitude == 150.0  # noqa: PLR2004
     assert entry.acquisition_setup.environment_temperature.magnitude == 23.11  # noqa: PLR2004
-    assert entry.results[0].channels[0].channel_name == '1F:Phase1'
+    assert entry.results[0].image_channels[0].channel_name == '1F:Phase1'
 
 
 # ==========================================
@@ -73,8 +79,11 @@ def test_ntmdt_schema_normalization(mock_read_ntmdt):
 
 
 @patch('nomad_measurements_afm.schema_packages.schema_package.read_bruker')
-def test_bruker_schema_normalization(mock_read_bruker):
+@patch('nomad.datamodel.hdf5.HDF5Dataset._normalize_impl')
+def test_bruker_schema_normalization(mock_hdf5_normalize, mock_read_bruker):
     """Tests if the Bruker schema accurately maps deep metadata and channels."""
+
+    mock_hdf5_normalize.return_value = 'dummy_hdf5_path'
 
     mock_data = MagicMock()
     mock_data.metadata = {
@@ -119,6 +128,9 @@ def test_bruker_schema_normalization(mock_read_bruker):
     entry = ELNBrukerMicroscopy()
     entry.data_file = 'bruker_scan.003'
 
+    # Attach the entry to the archive before normalizing
+    archive.data = entry
+
     entry.normalize(archive, None)
 
     # Assert Base Metadata
@@ -144,11 +156,10 @@ def test_bruker_schema_normalization(mock_read_bruker):
     assert entry.raw_metadata['Scanner file'] == '9575jvlr.scn'
 
     # Assert Channel Data (Step size = scan_size / resolution)
-    channel = entry.results[0].channels[0]
+    channel = entry.results[0].image_channels[0]
     assert channel.channel_name == 'Retrace_Height'
     expected_step = (10000.0 * 1e-9) / 256
     assert np.isclose(channel.x_step_size.magnitude, expected_step)
 
     # Ensure it routed to image_data because y_resolution > 1
     assert channel.image_data is not None
-    assert channel.line_data is None
