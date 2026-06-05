@@ -2,7 +2,6 @@ import datetime
 from unittest.mock import MagicMock, patch
 
 import numpy as np
-import nomad.files
 from nomad.datamodel import EntryArchive
 from nomad.datamodel.datamodel import EntryMetadata
 
@@ -17,11 +16,11 @@ from nomad_measurements_afm.schema_packages.schema_package import (
 
 
 @patch('nomad_measurements_afm.schema_packages.schema_package.read_ntmdt')
-@patch('nomad.files.UploadFiles.get')
-def test_ntmdt_schema_normalization(mock_upload_files_get, mock_read_ntmdt, tmp_path):
+@patch('nomad.datamodel.hdf5.HDF5Dataset._normalize_impl')
+def test_ntmdt_schema_normalization(mock_hdf5_normalize, mock_read_ntmdt):
     """Tests if the NT-MDT schema accurately maps data into NOMAD Quantities."""
 
-    mock_upload_files_get.return_value.archive_hdf5_location.return_value = str(tmp_path / 'test.h5')
+    mock_hdf5_normalize.return_value = 'dummy_hdf5_path'
 
     mock_data = MagicMock()
     mock_data.metadata = {'Total Frames': 1}
@@ -80,11 +79,11 @@ def test_ntmdt_schema_normalization(mock_upload_files_get, mock_read_ntmdt, tmp_
 
 
 @patch('nomad_measurements_afm.schema_packages.schema_package.read_bruker')
-@patch('nomad.files.UploadFiles.get')
-def test_bruker_schema_normalization(mock_upload_files_get, mock_read_bruker, tmp_path):
+@patch('nomad.datamodel.hdf5.HDF5Dataset._normalize_impl')
+def test_bruker_schema_normalization(mock_hdf5_normalize, mock_read_bruker):
     """Tests if the Bruker schema accurately maps deep metadata and channels."""
 
-    mock_upload_files_get.return_value.archive_hdf5_location.return_value = str(tmp_path / 'test.h5')
+    mock_hdf5_normalize.return_value = 'dummy_hdf5_path'
 
     mock_data = MagicMock()
     mock_data.metadata = {
