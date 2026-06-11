@@ -1,12 +1,14 @@
 import re
 
+from nomad.datamodel.context import ServerContext
 from nomad.datamodel.datamodel import EntryArchive
 from nomad.parsing.parser import MatchingParser
+from nomad_measurements.utils import create_archive
 
-# Import both of our specialized schemas!
 from nomad_measurements_afm.schema_packages.schema_package import (
     ELNBrukerMicroscopy,
     ELNNTMDTMicroscopy,
+    RawFileAFMData,
 )
 
 
@@ -51,22 +53,34 @@ class AFMParser(MatchingParser):
     ) -> None:
         logger = logger or archive.m_context.logger
 
-        # Extract just the filename from the path
-        filename = mainfile.rsplit('/', maxsplit=1)[-1]
-        filename_lower = filename.lower()
+        # Extract the filename, handling server context paths correctly
+        data_file = mainfile.rsplit('/', maxsplit=1)[-1]
+        if isinstance(archive.m_context, ServerContext):
+            data_file = mainfile.split('/raw/', 1)[1]
+
+        filename_lower = data_file.lower()
 
         # Route to the correct Schema based on the file extension
         if filename_lower.endswith('.mdt'):
-            entry = ELNNTMDTMicroscopy()
+            entry = ELNNTMDTMicroscopy.m_from_dict(ELNNTMDTMicroscopy.m_def.a_template)
         elif filename_lower.endswith('.spm') or re.search(r'\.\d{3}$', filename_lower):
-            entry = ELNBrukerMicroscopy()
+            entry = ELNBrukerMicroscopy.m_from_dict(
+                ELNBrukerMicroscopy.m_def.a_template
+            )
         else:
-            logger.error(f'Unsupported AFM file format: {filename}')
+            logger.error(f'Unsupported AFM file format: {data_file}')
             return
 
-        # Assign the file and attach the schema to the archive
-        entry.data_file = filename
-        archive.data = entry
+        # Assign the file name to the entry
+        entry.data_file = data_file
 
-        # Trigger the reader inside the schema's normalize function
-        entry.normalize(archive, logger)
+        # Create the separate editable .archive.json file to preserve ELN edits
+        archive_name = f'{"".join(data_file.split(".")[:-1])}.archive.json'
+
+        # Link the raw file to the generated ELN using the placeholder
+        archive.data = RawFileAFMData(
+            measurement=create_archive(entry, archive, archive_name)
+        )
+
+        # Clean up the display name in the GUI
+        archive.metadata.entry_name = f'{data_file} data file'

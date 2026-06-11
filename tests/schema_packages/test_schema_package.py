@@ -52,9 +52,10 @@ def test_ntmdt_schema_normalization(mock_hdf5_normalize, mock_read_ntmdt):
     archive.m_context = MagicMock()
     archive.metadata = EntryMetadata(entry_name='dummy_scan.mdt')
 
-    mock_file_context = MagicMock()
-    mock_file_context.name = 'dummy_scan.mdt'
-    archive.m_context.raw_file.return_value.__enter__.return_value = mock_file_context
+    # Mock the new os_path extraction logic
+    mock_raw_file_object = MagicMock()
+    mock_raw_file_object.os_path = '/fake/path/dummy_scan.mdt'
+    archive.m_context.upload_files.raw_file_object.return_value = mock_raw_file_object
 
     entry = ELNNTMDTMicroscopy()
     entry.data_file = 'dummy_scan.mdt'
@@ -121,9 +122,10 @@ def test_bruker_schema_normalization(mock_hdf5_normalize, mock_read_bruker):
     archive.m_context = MagicMock()
     archive.metadata = EntryMetadata(entry_name='bruker_scan.003')
 
-    mock_file_context = MagicMock()
-    mock_file_context.name = 'bruker_scan.003'
-    archive.m_context.raw_file.return_value.__enter__.return_value = mock_file_context
+    # Mock the new os_path extraction logic
+    mock_raw_file_object = MagicMock()
+    mock_raw_file_object.os_path = '/fake/path/bruker_scan.003'
+    archive.m_context.upload_files.raw_file_object.return_value = mock_raw_file_object
 
     entry = ELNBrukerMicroscopy()
     entry.data_file = 'bruker_scan.003'

@@ -1,11 +1,12 @@
 from unittest.mock import MagicMock, patch
 
-from nomad.datamodel import EntryArchive
+from nomad.datamodel.datamodel import EntryArchive, EntryMetadata
 
 from nomad_measurements_afm.parsers.parser import AFMParser
 from nomad_measurements_afm.schema_packages.schema_package import (
     ELNBrukerMicroscopy,
     ELNNTMDTMicroscopy,
+    RawFileAFMData,
 )
 
 
@@ -73,33 +74,57 @@ def test_is_mainfile_invalid_signature(tmp_path):
         )
 
 
-@patch(
-    'nomad_measurements_afm.schema_packages.schema_package.ELNNTMDTMicroscopy.normalize'
-)
-def test_parse_triggers_ntmdt_schema(mock_normalize):
-    """Tests if parsing a .mdt file correctly routes to the NT-MDT schema."""
+@patch('nomad_measurements_afm.parsers.parser.create_archive')
+def test_parse_triggers_ntmdt_schema(mock_create_archive):
+    """Tests if parsing a .mdt file correctly routes to the NT-MDT schema via Two-Archive."""
+    mock_create_archive.return_value = 'mocked_archive_reference'
+
     parser = AFMParser(mainfile_name_re=r'^.*\.(mdt|\d{3})$')
+
+    # Setup the mock NOMAD environment context and metadata
     archive = EntryArchive()
+    archive.metadata = EntryMetadata()  # <--- FIX: Initialize metadata here
     archive.m_context = MagicMock()
+    logger = MagicMock()
 
-    parser.parse(mainfile='/fake/path/to/scan_file.mdt', archive=archive)
+    parser.parse(mainfile='/fake/path/to/scan_file.mdt', archive=archive, logger=logger)
 
-    assert isinstance(archive.data, ELNNTMDTMicroscopy)
-    assert archive.data.data_file == 'scan_file.mdt'
-    mock_normalize.assert_called_once()
+    # Check that the placeholder was attached
+    assert isinstance(archive.data, RawFileAFMData)
+    assert archive.data.measurement.m_proxy_value == 'mocked_archive_reference'
+
+    # Check that the correct ELN was created
+    mock_create_archive.assert_called_once()
+    entry, _, archive_name = mock_create_archive.call_args[0]
+
+    assert isinstance(entry, ELNNTMDTMicroscopy)
+    assert entry.data_file == 'scan_file.mdt'
+    assert archive_name == 'scan_file.archive.json'
 
 
-@patch(
-    'nomad_measurements_afm.schema_packages.schema_package.ELNBrukerMicroscopy.normalize'
-)
-def test_parse_triggers_bruker_schema(mock_normalize):
-    """Tests if parsing a .003 file correctly routes to the Bruker schema."""
+@patch('nomad_measurements_afm.parsers.parser.create_archive')
+def test_parse_triggers_bruker_schema(mock_create_archive):
+    """Tests if parsing a .003 file correctly routes to the Bruker schema via Two-Archive."""
+    mock_create_archive.return_value = 'mocked_archive_reference'
+
     parser = AFMParser(mainfile_name_re=r'^.*\.(mdt|\d{3})$')
+
+    # Setup the mock NOMAD environment context and metadata
     archive = EntryArchive()
+    archive.metadata = EntryMetadata()  # <--- FIX: Initialize metadata here
     archive.m_context = MagicMock()
+    logger = MagicMock()
 
-    parser.parse(mainfile='/fake/path/to/scan_file.003', archive=archive)
+    parser.parse(mainfile='/fake/path/to/scan_file.003', archive=archive, logger=logger)
 
-    assert isinstance(archive.data, ELNBrukerMicroscopy)
-    assert archive.data.data_file == 'scan_file.003'
-    mock_normalize.assert_called_once()
+    # Check that the placeholder was attached
+    assert isinstance(archive.data, RawFileAFMData)
+    assert archive.data.measurement.m_proxy_value == 'mocked_archive_reference'
+
+    # Check that the correct ELN was created
+    mock_create_archive.assert_called_once()
+    entry, _, archive_name = mock_create_archive.call_args[0]
+
+    assert isinstance(entry, ELNBrukerMicroscopy)
+    assert entry.data_file == 'scan_file.003'
+    assert archive_name == 'scan_file.archive.json'
