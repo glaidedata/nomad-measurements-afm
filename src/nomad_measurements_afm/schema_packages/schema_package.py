@@ -3,6 +3,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from ientrance_instruments.schema_packages.schema_package import IEntranceInstrument
 from nomad.datamodel.data import JSON, ArchiveSection, EntryData
 from nomad.datamodel.hdf5 import HDF5Dataset
 from nomad.datamodel.metainfo.annotations import ELNComponentEnum, H5WebAnnotation
@@ -193,6 +194,9 @@ class AFMResult(MeasurementResult):
 class BaseAFMMicroscopy(Measurement):
     """Base class containing shared attributes for all AFM entries."""
 
+    # Hidden field to preload the custom schema and prevent GUI crashes
+    _instrument_schema_preload = Quantity(type=IEntranceInstrument)
+
     data_file = Quantity(
         type=str,
         a_eln=dict(component=ELNComponentEnum.FileEditQuantity),
@@ -337,8 +341,11 @@ class ELNNTMDTMicroscopy(BaseAFMMicroscopy, EntryData):
             return
 
         try:
-            with archive.m_context.raw_file(self.data_file) as file:
-                afm_data = read_ntmdt(file.name)
+            # Get the absolute OS path directly
+            file_path = archive.m_context.upload_files.raw_file_object(
+                self.data_file
+            ).os_path
+            afm_data = read_ntmdt(file_path)
 
             self.instrument_model = 'NT-MDT AFM'
             self.total_frames = afm_data.metadata.get('Total Frames')
@@ -536,8 +543,11 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
             return
 
         try:
-            with archive.m_context.raw_file(self.data_file) as file:
-                afm_data = read_bruker(file.name)
+            # Get the absolute OS path directly
+            file_path = archive.m_context.upload_files.raw_file_object(
+                self.data_file
+            ).os_path
+            afm_data = read_bruker(file_path)
 
             self._map_metadata(afm_data)
 
@@ -557,6 +567,18 @@ class ELNBrukerMicroscopy(BaseAFMMicroscopy, EntryData):
             raise e
 
         super().normalize(archive, logger)
+
+
+class RawFileAFMData(EntryData):
+    """Placeholder for the raw AFM file to point to the generated ELN."""
+
+    m_def = Section(label='Raw AFM Data File')
+
+    measurement = Quantity(
+        type=BaseAFMMicroscopy,
+        a_eln=dict(component=ELNComponentEnum.ReferenceEditQuantity),
+        description='The editable ELN archive generated from this raw file.',
+    )
 
 
 m_package.__init_metainfo__()
