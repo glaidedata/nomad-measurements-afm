@@ -14,7 +14,7 @@ classifiers = [
 ]
 name = "nomad-measurements-afm"
 description = "NOMAD plugin for Atomic Force Microscopy (AFM) data"
-version = "0.5.2"
+version = "0.5.3"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/abbasgholami71/nomad-measurements-afm"
+Repository = "https://github.com/glaidedata/nomad-measurements-afm"
 
 [project.optional-dependencies]
 dev = [
