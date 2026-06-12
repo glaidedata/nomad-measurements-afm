@@ -14,7 +14,7 @@ classifiers = [
 ]
 name = "nomad-measurements-afm"
 description = "NOMAD plugin for Atomic Force Microscopy (AFM) data"
-version = "0.5.1"
+version = "0.5.2"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -27,7 +27,7 @@ license = { file = "LICENSE" }
 dependencies = [
     "nomad-lab>=1.4.1",
     "nomad-measurements",
-    "ientrance-instruments @ git+https://github.com/glaidedata/nomad-ientrance-instruments.git@v0.1.1",
+    "ientrance-instruments @ git+https://github.com/glaidedata/nomad-ientrance-instruments.git@v0.1.2",
     "readers-ientrance @ git+https://github.com/glaidedata/readers-ientrance.git@v0.5.0"
 ]
 
