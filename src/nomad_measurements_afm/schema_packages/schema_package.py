@@ -3,7 +3,6 @@ import re
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from ientrance_instruments.schema_packages.schema_package import IEntranceInstrument
 from nomad.datamodel.data import JSON, ArchiveSection, EntryData
 from nomad.datamodel.hdf5 import HDF5Dataset
 from nomad.datamodel.metainfo.annotations import ELNComponentEnum, H5WebAnnotation
@@ -193,9 +192,6 @@ class AFMResult(MeasurementResult):
 # ==========================================
 class BaseAFMMicroscopy(Measurement):
     """Base class containing shared attributes for all AFM entries."""
-
-    # Hidden field to preload the custom schema and prevent GUI crashes
-    _instrument_schema_preload = Quantity(type=IEntranceInstrument)
 
     data_file = Quantity(
         type=str,
